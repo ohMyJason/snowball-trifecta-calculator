@@ -15,12 +15,13 @@
       background: #1576e8;
       color: #fff; padding: 20px 24px; text-align: center;
       box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
     }
     .header h1 { font-size: 22px; font-weight: 600; letter-spacing: 1px; }
     .header p { font-size: 13px; color: #8eaadc; margin-top: 4px; }
 
     /* Main */
-    .main { flex: 1; padding: 16px; max-width: 1200px; width: 100%; margin: 0 auto; }
+    .main { flex: 1; padding: 16px; max-width: 1200px; width: 100%; margin: 0 auto; padding-top: 80px; }
 
     /* Instructions card */
     .instruction-card {
@@ -157,7 +158,7 @@
       .header h1 { font-size: 17px; letter-spacing: 0; }
       .header p { font-size: 12px; }
 
-      .main { padding: 10px 12px; }
+      .main { padding: 10px 12px; padding-top: 70px; }
 
       .instruction-card { padding: 12px 14px; margin-bottom: 12px; }
       .instruction-card h3 { font-size: 14px; }
@@ -337,7 +338,7 @@
         <div class="welcome-icon">👋</div>
         <p>欢迎使用<strong>三分法基金份额同比例增减速算器</strong>！</p>
         <ul class="welcome-list">
-          <li>本工具是<strong>纯前端应用</strong>，没有任何服务端</li>
+          <li>本工具是<strong>纯本地应用</strong>，没有任何服务端</li>
           <li>所有数据都保存在<strong>你的浏览器本地</strong>，从未离开你的设备</li>
           <li>数据绝对安全，请放心使用</li>
           <li>完全免费，不收取任何费用</li>
@@ -504,7 +505,14 @@ new Vue({
       try {
         this.userConfig = JSON.parse(saved);
         if (this.userConfig.categories) {
-          this.categories = this.userConfig.categories;
+          var self = this;
+          this.categories = this.userConfig.categories.map(function(c) {
+            c.gradient = c.gradient || self.makeGradient(c.color);
+            if (!c._ratio || c._ratio.length !== c.funds.length) {
+              c._ratio = c.funds.map(function(f) { return c.totalPercent > 0 ? f.weight / c.totalPercent : 1 / c.funds.length; });
+            }
+            return c;
+          });
         }
       } catch (e) {
         console.error('Failed to load config:', e);
@@ -524,8 +532,10 @@ new Vue({
             key: c.key,
             name: c.name,
             color: c.color,
+            gradient: c.gradient,
             totalPercent: c.totalPercent,
-            funds: c.funds.map(function(f) { return { name: f.name, code: f.code, weight: f.weight }; })
+            funds: c.funds.map(function(f) { return { name: f.name, code: f.code, weight: f.weight }; }),
+            _ratio: c._ratio
           };
         }),
         savedAt: Date.now()
@@ -639,7 +649,8 @@ new Vue({
           color: matchedType.color,
           gradient: this.makeGradient(matchedType.color),
           totalPercent: totalPercent,
-          funds: funds
+          funds: funds,
+          _ratio: funds.map(function(f) { return totalPercent > 0 ? f.weight / totalPercent : 1 / funds.length; })
         });
       }
 
@@ -661,6 +672,11 @@ new Vue({
     onCategoryTotalFocus: function(ci) {
       var cat = this.categories[ci];
       cat._snap = cat.funds.map(function(f) { return f.weight; });
+      // 如果当前权重全是 0（用户之前填过 0），且历史比例还在，恢复历史比例到 snapshot
+      var snapSum = cat._snap.reduce(function(s, w) { return s + w; }, 0);
+      if (snapSum === 0 && cat._ratio && cat._ratio.length === cat.funds.length) {
+        cat._snap = cat._ratio.slice();
+      }
     },
 
     onCategoryTotalBlur: function(ci, event) {
@@ -671,23 +687,57 @@ new Vue({
 
       cat.totalPercent = newTotal;
 
-      if (snapshot && snapshot.length === fundsLen && fundsLen > 0) {
+      if (fundsLen === 0) {
+        cat._snap = null;
+        this.saveConfig();
+        return;
+      }
+
+      if (snapshot && snapshot.length === fundsLen) {
         var oldSum = snapshot.reduce(function(s, w) { return s + w; }, 0);
-        if (oldSum > 0) {
+
+        if (newTotal === 0) {
+          // 填 0：权重归零，但记住比例
+          if (oldSum > 0) {
+            cat._ratio = snapshot.map(function(w) { return w / oldSum; });
+          }
+          for (var i = 0; i < fundsLen; i++) {
+            cat.funds[i].weight = 0;
+          }
+        } else if (oldSum > 0) {
           var ratio = newTotal / oldSum;
           for (var i = 0; i < fundsLen; i++) {
             cat.funds[i].weight = +(snapshot[i] * ratio).toFixed(4);
+          }
+          // 记住新比例
+          cat._ratio = cat.funds.map(function(f) { return f.weight / newTotal; });
+        } else if (cat._ratio && cat._ratio.length === fundsLen) {
+          // snapshot 全 0，但记住了历史比例，用比例恢复
+          for (var i = 0; i < fundsLen; i++) {
+            cat.funds[i].weight = +(cat._ratio[i] * newTotal).toFixed(4);
           }
         } else {
           var avg = newTotal / fundsLen;
           for (var i = 0; i < fundsLen; i++) {
             cat.funds[i].weight = +avg.toFixed(4);
           }
+          cat._ratio = cat.funds.map(function() { return 1 / fundsLen; });
         }
       } else if (fundsLen > 0) {
-        var avg = newTotal / fundsLen;
-        for (var i = 0; i < fundsLen; i++) {
-          cat.funds[i].weight = +avg.toFixed(4);
+        var currentWeights = cat.funds.map(function(f) { return f.weight; });
+        var curSum = currentWeights.reduce(function(s, w) { return s + w; }, 0);
+        if (curSum > 0) {
+          var r = newTotal / curSum;
+          for (var i = 0; i < fundsLen; i++) {
+            cat.funds[i].weight = +(currentWeights[i] * r).toFixed(4);
+          }
+          cat._ratio = cat.funds.map(function(f) { return f.weight / newTotal; });
+        } else {
+          var avg = newTotal / fundsLen;
+          for (var i = 0; i < fundsLen; i++) {
+            cat.funds[i].weight = +avg.toFixed(4);
+          }
+          cat._ratio = cat.funds.map(function() { return 1 / fundsLen; });
         }
       }
 
@@ -703,6 +753,10 @@ new Vue({
       cat.totalPercent = cat.funds.reduce(function(sum, f) {
         return sum + f.weight;
       }, 0);
+      // 更新比例
+      if (cat.totalPercent > 0) {
+        cat._ratio = cat.funds.map(function(f) { return f.weight / cat.totalPercent; });
+      }
       this.saveConfig();
     },
 
@@ -712,6 +766,8 @@ new Vue({
       for (var i = 0; i < cat.funds.length; i++) {
         cat.funds[i].weight = +avg.toFixed(4);
       }
+      // 更新比例
+      cat._ratio = cat.funds.map(function() { return 1 / cat.funds.length; });
       this.saveConfig();
       this.$message.success(cat.name + ' 已平均分配');
     },
@@ -727,6 +783,9 @@ new Vue({
       }).then(function() {
         cat.funds.splice(fi, 1);
         cat.totalPercent = cat.funds.reduce(function(sum, f) { return sum + f.weight; }, 0);
+        if (cat.totalPercent > 0) {
+          cat._ratio = cat.funds.map(function(f) { return f.weight / cat.totalPercent; });
+        }
         self.saveConfig();
       }).catch(function() {});
     },
