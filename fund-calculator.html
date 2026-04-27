@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>三分法基金份额同比例增减速算器</title>
+  <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f0f2f5; }
+    #app { min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* Header */
+    .header {
+      background: #1576e8;
+      color: #fff; padding: 20px 24px; text-align: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    }
+    .header h1 { font-size: 22px; font-weight: 600; letter-spacing: 1px; }
+    .header p { font-size: 13px; color: #8eaadc; margin-top: 4px; }
+
+    /* Main */
+    .main { flex: 1; padding: 16px; max-width: 1200px; width: 100%; margin: 0 auto; }
+
+    /* Instructions card */
+    .instruction-card {
+      background: #fffbe6; border: 1px solid #ffe58f; border-radius: 8px;
+      padding: 16px 20px; margin-bottom: 16px;
+    }
+    .instruction-card h3 { font-size: 15px; color: #d48806; margin-bottom: 8px; }
+    .instruction-card .step { font-size: 13px; color: #595959; line-height: 1.8; margin-left: 16px; }
+    .instruction-card .step em { font-style: normal; color: #1890ff; font-weight: 600; }
+
+    /* Input area */
+    .input-card {
+      background: #fff; border-radius: 8px; padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 16px;
+    }
+    .input-card .label { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 10px; }
+    .input-card textarea {
+      width: 100%; height: 160px; border: 1px solid #d9d9d9; border-radius: 6px;
+      padding: 12px; font-size: 13px; font-family: "SF Mono", "Fira Code", monospace;
+      resize: vertical; outline: none; transition: border-color 0.2s;
+    }
+    .input-card textarea:focus { border-color: #1890ff; box-shadow: 0 0 0 2px rgba(24,144,255,0.1); }
+    .input-card .actions { margin-top: 12px; display: flex; gap: 10px; }
+
+    /* Dashboard */
+    .dashboard { display: flex; flex-direction: column; gap: 14px; }
+
+    /* Total progress bar */
+    .total-bar {
+      background: #fff; border-radius: 8px; padding: 16px 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .total-bar .segment { height: 24px; transition: width 0.3s; min-width: 0; }
+    .total-bar .gap { background: #f0f0f0; }
+
+    /* Category card */
+    .cat-card {
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08); background: #fff;
+    }
+    .cat-header {
+      padding: 14px 20px;
+      display: flex; align-items: flex-start; justify-content: space-between;
+      flex-wrap: wrap; gap: 10px; border-radius: 8px 8px 0 0;
+      position: relative;
+    }
+    .cat-title-wrap { display: flex; align-items: center; gap: 8px; }
+    .cat-bar { width: 3px; height: 18px; border-radius: 2px; flex-shrink: 0; }
+    .cat-header .title { display: flex; align-items: center; gap: 8px; }
+    .cat-header .title h3 { font-size: 15px; font-weight: 600; }
+    .cat-header .cat-controls { display: flex; align-items: center; gap: 10px; }
+    .cat-header .total-edit { display: flex; align-items: center; gap: 6px; }
+    .cat-header .total-edit input {
+      width: 72px; text-align: center; border: 1px solid rgba(0,0,0,0.1);
+      background: rgba(255,255,255,0.85);
+      color: #333; font-size: 18px; font-weight: 700; border-radius: 4px; padding: 2px 4px; outline: none;
+    }
+    .cat-header .total-edit input:focus { border-color: #1576e8; }
+    .cat-header .total-edit span { font-size: 14px; font-weight: 600; }
+
+    .btn-avg {
+      background: rgba(255,255,255,0.6); border: 1px solid;
+      padding: 4px 14px; border-radius: 4px; font-size: 12px; cursor: pointer;
+      transition: all 0.2s; font-weight: 500;
+    }
+    .btn-avg:hover { background: rgba(255,255,255,0.9); }
+    .dropdown-arrow { color: #909399; transition: transform 0.2s; }
+    .dropdown-arrow:hover { color: #1576e8; transform: scale(1.2); }
+
+    /* Example dialog */
+    .example-dialog { position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; margin: 0 !important; max-width: 90vw !important; max-height: 85vh !important; overflow: auto; z-index: 2000 !important; }
+    .example-dialog .el-dialog__header { padding: 12px 16px; border-bottom: 1px solid #e4e7ed; }
+    .example-dialog .el-dialog__title { font-size: 16px; font-weight: 600; text-align: center; width: 100%; }
+    .example-dialog .el-dialog__body { padding: 16px 20px; }
+    .example-dialog .el-dialog__headerbtn { top: 10px; right: 12px; z-index: 1; }
+    .example-dialog .el-overlay { z-index: 1999 !important; }
+    .example-images { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    .example-item { flex: 0 1 280px; max-width: 280px; text-align: center; }
+    .example-item img { width: 100%; height: auto; border-radius: 8px; border: 1px solid #e4e7ed; }
+    .example-item .img-desc { font-size: 12px; color: #999; margin-top: 6px; }
+
+    .fund-list { padding: 0 20px 16px; }
+    .fund-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; margin-top: 8px;
+      background: #fafafa; border-radius: 6px;
+      border-left: 3px solid transparent; transition: background 0.2s;
+    }
+    .fund-item:hover { background: #f0f5ff; }
+    .fund-item .info { flex: 1; }
+    .fund-item .name { font-size: 14px; font-weight: 500; color: #333; }
+    .fund-item .code { font-size: 12px; color: #999; margin-top: 2px; }
+    .fund-item .right-side {
+      display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+    }
+    .fund-item .bar-wrap { width: 80px; height: 6px; background: #f0f0f0; border-radius: 3px; overflow: hidden; }
+    .fund-item .bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+    .fund-item .weight-input { display: flex; align-items: center; gap: 4px; }
+    .fund-item .weight-input input {
+      width: 64px; text-align: center; border: 1px solid #e8e8e8; border-radius: 4px;
+      padding: 4px 6px; font-size: 14px; font-weight: 600; outline: none; transition: border-color 0.2s;
+    }
+    .fund-item .weight-input input:focus { border-color: #1890ff; }
+    .fund-item .weight-input span { color: #999; font-size: 13px; }
+    .fund-item .btn-remove { color: #999; cursor: pointer; font-size: 16px; transition: opacity 0.2s; margin-left: 8px; }
+    .fund-item .btn-remove:hover { opacity: 1; }
+
+    /* Validation bar */
+    .validation-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      padding: 12px 24px; text-align: center; font-size: 14px; font-weight: 600;
+      z-index: 100;
+    }
+    .validation-bar.ok { background: #f6ffed; color: #52c41a; border-top: 1px solid #b7eb8f; }
+    .validation-bar.warn { background: #fffbe6; color: #d48806; border-top: 1px solid #ffe58f; }
+    .validation-bar.error { background: #ff4d4f; color: #fff; border-top: none; box-shadow: 0 -2px 8px rgba(255,77,79,0.3); }
+
+    .padding-bottom { height: 52px; }
+
+    /* Welcome dialog */
+    .welcome-dialog { position: fixed !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; margin: 0 !important; z-index: 2000 !important; }
+    .welcome-dialog .el-overlay { z-index: 1999 !important; }
+    .welcome-content { text-align: center; padding: 10px 0; }
+    .welcome-icon { font-size: 48px; margin-bottom: 12px; }
+    .welcome-content p { font-size: 15px; color: #333; margin-bottom: 14px; }
+    .welcome-list { list-style: none; padding: 0; text-align: left; }
+    .welcome-list li { font-size: 13px; color: #595959; line-height: 2; padding-left: 20px; position: relative; }
+    .welcome-list li::before { content: '✓'; position: absolute; left: 0; color: #52c41a; font-weight: 700; }
+    .welcome-list li strong { color: #1576e8; }
+
+    /* ===================== Responsive: Mobile ===================== */
+    @media (max-width: 640px) {
+      .header { padding: 14px 16px; }
+      .header h1 { font-size: 17px; letter-spacing: 0; }
+      .header p { font-size: 12px; }
+
+      .main { padding: 10px 12px; }
+
+      .instruction-card { padding: 12px 14px; margin-bottom: 12px; }
+      .instruction-card h3 { font-size: 14px; }
+      .instruction-card .step { font-size: 12px; line-height: 1.7; margin-left: 12px; }
+      .instruction-card .el-button { padding: 6px 12px; font-size: 12px; }
+
+      .input-card { padding: 14px; margin-bottom: 12px; }
+      .input-card .label { font-size: 13px; }
+      .input-card textarea { height: 120px; font-size: 12px; padding: 10px; }
+
+      .dashboard { gap: 12px; }
+
+      .total-bar { padding: 12px 14px; }
+      .total-bar > div:first-child { font-size: 12px !important; margin-bottom: 6px !important; }
+      .total-bar .legend-item { gap: 4px !important; }
+      .total-bar .legend-dot { width: 8px !important; height: 8px !important; }
+      .total-bar .legend-text { font-size: 12px !important; }
+      .total-bar .gap-text { font-size: 11px !important; }
+      .total-bar .bar-container { height: 20px !important; }
+      .total-bar .el-progress { margin-top: 8px !important; }
+      .total-bar .warning-box {
+        margin-top: 8px !important;
+        padding: 6px 10px !important;
+        font-size: 12px !important;
+      }
+
+      .cat-card { border-radius: 6px; }
+      .cat-bar { width: 3px; height: 16px !important; }
+      .cat-header {
+        padding: 12px 14px !important;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        border-radius: 6px;
+      }
+      .cat-title-wrap { width: 100%; }
+      .cat-header .title { width: 100%; }
+      .cat-header .title h3 { font-size: 14px; }
+      .cat-header .title span { font-size: 11px !important; }
+      .cat-header .cat-controls {
+        display: flex; align-items: center; justify-content: space-between;
+        width: 100%; gap: 8px;
+      }
+
+      .cat-header .total-edit input {
+        width: 64px; font-size: 18px; padding: 6px 8px;
+      }
+      .cat-header .total-edit span { font-size: 13px; }
+
+      .btn-avg { padding: 6px 12px; font-size: 12px; }
+
+      .fund-list { padding: 0 14px 12px; }
+      .fund-item {
+        flex-wrap: wrap;
+        padding: 10px 12px;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .fund-item .info { min-width: 0; flex: 1 1 auto; width: 100%; }
+      .fund-item .name { font-size: 13px; }
+      .fund-item .code { font-size: 11px; }
+      .fund-item .right-side {
+        flex-shrink: 0;
+        gap: 6px;
+        align-items: center;
+      }
+      .fund-item .bar-wrap { display: none; }
+      .fund-item .weight-input { gap: 2px; }
+      .fund-item .weight-input input {
+        width: 56px; font-size: 13px; padding: 8px 4px;
+      }
+      .fund-item .weight-input span { font-size: 12px; }
+      .fund-item .btn-remove {
+        font-size: 20px;
+        margin-left: 0;
+        padding: 4px;
+      }
+
+      .fund-list .el-button { width: 100%; padding: 10px 0; font-size: 13px; }
+
+      .validation-bar {
+        padding: 10px 16px; font-size: 12px;
+      }
+
+      .input-card .actions { flex-wrap: wrap; }
+      .input-card .el-button { flex: 1; }
+
+      .prompt-expand-box {
+        position: static !important;
+        margin-top: 8px !important;
+        max-width: 100% !important;
+        min-width: auto !important;
+      }
+      .prompt-expand-box textarea {
+        height: 140px !important;
+        font-size: 11px !important;
+      }
+
+      .example-dialog {
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: 90vw !important;
+        max-width: 90vw !important;
+        max-height: 80vh !important;
+        z-index: 2000 !important;
+      }
+      .example-dialog .el-dialog__header { padding: 10px 14px !important; }
+      .example-dialog .el-dialog__title { font-size: 15px !important; }
+      .example-dialog .el-dialog__body { padding: 12px 16px !important; }
+      .example-dialog .el-overlay { z-index: 1999 !important; }
+      .example-images {
+        flex-direction: column !important;
+        align-items: center;
+        gap: 12px !important;
+      }
+      .example-item {
+        max-width: 260px !important;
+        width: 100%;
+      }
+      .example-item .img-desc { font-size: 11px !important; }
+      .example-dialog .el-dialog__footer { padding: 10px 16px 14px !important; text-align: center !important; }
+
+      .padding-bottom { height: 44px; }
+
+      .welcome-dialog {
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: 88vw !important;
+        max-width: 88vw !important;
+        z-index: 2000 !important;
+      }
+      .welcome-dialog .el-dialog__header { padding: 12px 14px !important; }
+      .welcome-dialog .el-dialog__title { font-size: 15px !important; }
+      .welcome-dialog .el-dialog__body { padding: 14px 16px !important; }
+      .welcome-dialog .el-overlay { z-index: 1999 !important; }
+      .welcome-content { padding: 0 !important; }
+      .welcome-icon { font-size: 36px !important; }
+      .welcome-content p { font-size: 14px !important; }
+      .welcome-list li { font-size: 12px !important; line-height: 1.8 !important; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <h1>雪球三分法基金份额同比例增减速算器</h1>
+    <p>公益工具 · 灵活调整大类比例，小类自动等比例缩放</p>
+  </div>
+
+  <div class="main">
+    <!-- 使用说明 -->
+    <div class="instruction-card">
+      <h3>使用说明</h3>
+      <div class="step">1. 将下面方框中的提示语复制给任意一个识图 AI</div>
+      <div class="step">2. 将你的<em>账户方案截图</em>发给 AI，让 AI 输出包含三大类比例及各大类下各基金比例的 JSON</div>
+      <div class="step">3. 将 AI 返回的 JSON 粘贴到下方输入框，点击「解析生成」</div>
+      <div class="step">4. 在生成的看板中，<em>调整大类比例</em>时小类自动等比例缩放；也可单独编辑小类权重</div>
+      <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <div style="position: relative;">
+          <el-button size="mini" @click="copyPrompt">复制提示语</el-button>
+          <span class="dropdown-arrow" @click="togglePromptExpand" style="cursor: pointer; padding: 0 6px; font-size: 10px; border-left: 1px solid #dcdfe6; margin-left: 2px;">▼</span>
+          <div v-if="promptExpanded" class="prompt-expand-box" style="position: absolute; top: 100%; left: 0; margin-top: 4px; background: #fff; border: 1px solid #dcdfe6; border-radius: 4px; padding: 10px; z-index: 100; min-width: 280px; max-width: 400px; box-shadow: 0 2px 12px rgba(0,0,0,0.15);">
+            <div style="font-size: 12px; color: #666; margin-bottom: 6px;">提示语全文（可手动复制）：</div>
+            <textarea readonly style="width: 100%; height: 180px; font-size: 12px; padding: 8px; border: 1px solid #e4e7ed; border-radius: 4px; resize: none; font-family: inherit; line-height: 1.5;" v-model="promptText"></textarea>
+          </div>
+        </div>
+        <el-button size="mini" type="primary" @click="loadSample">加载示例</el-button>
+        <el-button size="mini" @click="showExamples = true">查看示意图</el-button>
+      </div>
+    </div>
+
+    <!-- 欢迎弹窗 -->
+    <el-dialog title="温馨提示" :visible.sync="showWelcome" width="480px" :modal-append-to-body="true" custom-class="welcome-dialog" :close-on-click-modal="false" append-to-body>
+      <div class="welcome-content">
+        <div class="welcome-icon">👋</div>
+        <p>欢迎使用<strong>三分法基金份额同比例增减速算器</strong>！</p>
+        <ul class="welcome-list">
+          <li>本工具是<strong>纯前端应用</strong>，没有任何服务端</li>
+          <li>所有数据都保存在<strong>你的浏览器本地</strong>，从未离开你的设备</li>
+          <li>数据绝对安全，请放心使用</li>
+          <li>完全免费，不收取任何费用</li>
+          <li>纯自用 + 做着玩的工具，希望对你有帮助</li>
+        </ul>
+        <label style="font-size:12px;color:#999;display:flex;align-items:center;gap:4px;margin-top:12px;justify-content:center;">
+          <input type="checkbox" v-model="noShowWelcome" @change="onNoShowChange" /> 以后不再提示
+        </label>
+      </div>
+      <div slot="footer" style="text-align:center;">
+        <el-button type="primary" @click="showWelcome = false">我知道了</el-button>
+      </div>
+    </el-dialog>
+
+    <!-- 示意图弹窗 -->
+    <el-dialog title="AI 交互示意图" :visible.sync="showExamples" width="500px" :modal-append-to-body="true" custom-class="example-dialog" style="max-width: 90vw;" append-to-body>
+      <div class="example-images">
+        <div class="example-item">
+          <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #333;">步骤 1：发送提示语和截图</div>
+          <img src="assert/guide1.jpg" style="width: 100%; border-radius: 8px; border: 1px solid #e4e7ed;" alt="发送提示语和截图" />
+          <div class="img-desc">将提示语和方案截图发给 AI</div>
+        </div>
+        <div class="example-item">
+          <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #333;">步骤 2：复制 AI 返回的 JSON</div>
+          <img src="assert/guide2.jpg" style="width: 100%; border-radius: 8px; border: 1px solid #e4e7ed;" alt="复制 JSON" />
+          <div class="img-desc">点击右上角复制按钮，粘贴到本工具</div>
+        </div>
+      </div>
+      <div slot="footer" style="text-align: center; padding-top: 8px;">
+        <el-button size="small" type="primary" @click="showExamples = false">知道了</el-button>
+      </div>
+    </el-dialog>
+
+    <!-- JSON 输入 -->
+    <div class="input-card">
+      <div class="label">粘贴 JSON 数据：</div>
+      <textarea v-model="jsonInput" placeholder='粘贴 AI 返回的 JSON 数据，格式如：{"categories": [...]}'></textarea>
+      <div class="actions">
+        <el-button type="primary" icon="el-icon-check" @click="parseJson">解析生成</el-button>
+        <el-button icon="el-icon-delete" @click="clearData">清空</el-button>
+      </div>
+    </div>
+
+    <!-- 看板区域 -->
+    <div class="dashboard" v-if="categories.length">
+      <!-- 总比例进度条 -->
+      <div class="total-bar">
+        <div style="font-size:13px;color:#666;margin-bottom:8px;">总分配进度</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+          <div v-for="cat in categories" :key="cat.key" class="legend-item" style="display:flex;align-items:center;gap:6px;">
+            <span class="legend-dot" style="width:10px;height:10px;border-radius:50%;display:inline-block;" :style="{background:cat.color}"></span>
+            <span class="legend-text" style="font-size:13px;color:#333;font-weight:500;">{{cat.name}} {{cat.totalPercent.toFixed(2)}}%</span>
+          </div>
+          <span v-if="totalPercent < 100" class="gap-text" style="font-size:12px;color:#999;">剩余 {{(100 - totalPercent).toFixed(2)}}% 未分配</span>
+        </div>
+        <div class="bar-container" style="display:flex;border-radius:4px;overflow:hidden;height:24px;">
+          <div class="segment" v-for="cat in categories" :key="'bar-'+cat.key"
+               :style="{ width: Math.max(cat.totalPercent, 0.5) + '%', background: cat.color }"></div>
+          <div class="gap" v-if="totalPercent < 100" style="flex:1;"></div>
+        </div>
+        <el-progress
+          :percentage="Math.min(totalPercent, 100)" :show-text="false" :stroke-width="6"
+          :color="validationClass === 'ok' ? '#52c41a' : (validationClass === 'error' ? '#ff4d4f' : '#1890ff')"
+          style="margin-top: 10px;"></el-progress>
+        <div v-if="validationClass === 'error'" class="warning-box" style="margin-top: 10px; padding: 8px 14px; background: #fff1f0; border: 1px solid #ffa39e; border-radius: 6px; color: #ff4d4f; font-size: 13px; font-weight: 600;">
+          ⚠ 总比例超出 {{(totalPercent - 100).toFixed(2)}}%，请减少各大类分配比例至总计 100%
+        </div>
+      </div>
+
+      <!-- 各大类卡片 -->
+      <div class="cat-card" v-for="(cat, ci) in categories" :key="cat.key">
+        <div class="cat-header" :style="{ background: cat.gradient }">
+          <div class="cat-title-wrap">
+            <div class="cat-bar" :style="{ background: cat.color }"></div>
+            <div class="title">
+              <h3 :style="{ color: cat.color }">{{cat.name}}</h3>
+              <span :style="{ color: cat.color + 'aa', fontSize: '12px' }">({{cat.funds.length}}只基金)</span>
+            </div>
+          </div>
+          <div class="cat-controls">
+            <div class="total-edit">
+              <input type="number" step="0.01" :value="cat.totalPercent.toFixed(2)"
+                     @focus="onCategoryTotalFocus(ci)"
+                     @blur="onCategoryTotalBlur(ci, $event)"
+                     @keydown.enter="$event.target.blur()" />
+              <span :style="{ color: cat.color }">%</span>
+            </div>
+            <button class="btn-avg" :style="{ borderColor: cat.color, color: cat.color }" @click="avgCategory(ci)">一键平均</button>
+          </div>
+        </div>
+        <div class="fund-list">
+          <div class="fund-item" v-for="(fund, fi) in cat.funds" :key="fi">
+            <div class="info">
+              <div class="name">{{fund.name}}</div>
+              <div class="code">{{fund.code}}</div>
+            </div>
+            <div class="right-side">
+              <div class="bar-wrap">
+                <div class="bar-fill" :style="{ width: cat.totalPercent > 0 ? Math.min(fund.weight / cat.totalPercent * 100, 100) + '%' : '0%', background: cat.color }"></div>
+              </div>
+              <div class="weight-input">
+                <input type="number" step="0.01" :value="fund.weight.toFixed(2)"
+                       @input="onFundWeightInput(ci, fi, $event)" />
+                <span>%</span>
+              </div>
+              <span class="btn-remove" @click="removeFund(ci, fi)" title="移除该基金">&times;</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="padding-bottom"></div>
+  </div>
+
+  <!-- 底部验证栏 -->
+  <div class="validation-bar" v-if="categories.length"
+       :class="validationClass">
+    <template v-if="totalPercent < 100">
+      总比例 {{totalPercent.toFixed(2)}}% / 100%，剩余 {{(100 - totalPercent).toFixed(2)}}% 未完成分配，请调整至 100%
+    </template>
+    <template v-else-if="totalPercent > 100">
+      总比例 {{totalPercent.toFixed(2)}}% / 100%，超出 {{(totalPercent - 100).toFixed(2)}}%，请减少分配
+    </template>
+    <template v-else>
+      总比例 100%，分配完成！
+    </template>
+  </div>
+</div>
+
+<script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script>
+new Vue({
+  el: '#app',
+  data: function() {
+    return {
+      jsonInput: '',
+      categories: [],
+      showExamples: false,
+      promptExpanded: false,
+      promptText: '请帮我解析以下基金方案截图，以 Markdown 格式输出，包含三大类（偏债基金、偏股基金、商品基金）的总比例占比（相对账户总资产），以及各大类下每只基金的名称、代码和比例占比（相对账户总资产）。要求：\n\n1. 先用简短文字总结账户整体分配情况\n2. 然后用 Markdown 代码块输出 JSON（方便我直接复制），格式如下：\n\n```json\n{\n  "categories": [\n    {\n      "type": "bond",\n      "name": "偏债基金",\n      "totalPercent": 50,\n      "funds": [\n        {"name": "基金名称", "code": "基金代码", "weight": 占比百分比}\n      ]\n    },\n    {"type": "stock", "name": "偏股基金", "totalPercent": 30, "funds": [...]},\n    {"type": "commodity", "name": "商品基金", "totalPercent": 20, "funds": [...]}\n  ]\n}\n```\n\n注：weight 表示该基金占账户总资产的比例，同一大类下所有基金的 weight 之和应等于该类 totalPercent。三大类的 totalPercent 之和为 100。',
+      userConfig: null,
+      showWelcome: false,
+      noShowWelcome: false
+    };
+  },
+  computed: {
+    totalPercent: function() {
+      return this.categories.reduce(function(sum, cat) {
+        return sum + (cat.totalPercent || 0);
+      }, 0);
+    },
+    validationClass: function() {
+      var t = this.totalPercent;
+      if (Math.abs(t - 100) < 0.01) return 'ok';
+      if (t < 100) return 'warn';
+      return 'error';
+    }
+  },
+  mounted: function() {
+    var saved = localStorage.getItem('xq3way_config');
+    if (saved) {
+      try {
+        this.userConfig = JSON.parse(saved);
+        if (this.userConfig.categories) {
+          this.categories = this.userConfig.categories;
+        }
+      } catch (e) {
+        console.error('Failed to load config:', e);
+      }
+    }
+    var noShow = localStorage.getItem('xq3way_no_welcome');
+    if (!noShow) {
+      this.showWelcome = true;
+    }
+  },
+  methods: {
+    saveConfig: function() {
+      if (!this.categories || this.categories.length === 0) return;
+      var config = {
+        categories: this.categories.map(function(c) {
+          return {
+            key: c.key,
+            name: c.name,
+            color: c.color,
+            totalPercent: c.totalPercent,
+            funds: c.funds.map(function(f) { return { name: f.name, code: f.code, weight: f.weight }; })
+          };
+        }),
+        savedAt: Date.now()
+      };
+      localStorage.setItem('xq3way_config', JSON.stringify(config));
+    },
+
+    parseJson: function() {
+      var input = this.jsonInput.trim();
+      if (!input) {
+        this.$message.warning('请先粘贴 JSON 数据');
+        return;
+      }
+      var self = this;
+      if (this.categories && this.categories.length > 0) {
+        this.$confirm('此操作会覆盖当前方案数据，确定吗？', '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(function() {
+          self.doParseJson(input);
+        }).catch(function() {});
+      } else {
+        this.doParseJson(input);
+      }
+    },
+
+    doParseJson: function(input) {
+      try {
+        var jsonMatch = input.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch) input = jsonMatch[1].trim();
+
+        var data = JSON.parse(input);
+        var cats = this.extractCategories(data);
+        if (!cats || cats.length === 0) {
+          this.$message.error('未能从 JSON 中解析到有效的基金数据，请检查格式');
+          return;
+        }
+        this.categories = cats;
+        this.$message.success('解析成功！共 ' + cats.length + ' 个大类');
+        this.saveConfig();
+      } catch (e) {
+        this.$message.error('JSON 解析失败：' + e.message);
+      }
+    },
+
+    extractCategories: function(data) {
+      var result = [];
+      var defaultTypes = [
+        { key: 'bond', name: '偏债基金', color: '#1576e8' },
+        { key: 'stock', name: '偏股基金', color: '#e53935' },
+        { key: 'commodity', name: '商品基金', color: '#f5a623' }
+      ];
+
+      var categories = null;
+      if (Array.isArray(data.categories)) categories = data.categories;
+      else if (Array.isArray(data)) categories = data;
+      else {
+        for (var k in data) {
+          if (Array.isArray(data[k])) { categories = data[k]; break; }
+        }
+      }
+
+      if (!categories) return result;
+
+      for (var i = 0; i < categories.length; i++) {
+        var c = categories[i];
+        var typeKey = (c.type || '').toLowerCase();
+        var typeName = c.name || '';
+
+        var matchedType = null;
+        for (var j = 0; j < defaultTypes.length; j++) {
+          var dt = defaultTypes[j];
+          if (typeKey === dt.key) { matchedType = dt; break; }
+          if (dt.key === 'bond' && (typeName.indexOf('债') >= 0 || typeName.indexOf('Bond') >= 0)) { matchedType = dt; break; }
+          if (dt.key === 'stock' && (typeName.indexOf('股') >= 0 || typeName.indexOf('Stock') >= 0 || typeName.indexOf('股票') >= 0)) { matchedType = dt; break; }
+          if (dt.key === 'commodity' && (typeName.indexOf('商品') >= 0 || typeName.indexOf('Commodity') >= 0 || typeName.indexOf('黄金') >= 0)) { matchedType = dt; break; }
+        }
+
+        if (!matchedType) {
+          if (typeName.indexOf('债') >= 0) matchedType = defaultTypes[0];
+          else if (typeName.indexOf('股') >= 0 || typeName.indexOf('股票') >= 0) matchedType = defaultTypes[1];
+          else if (typeName.indexOf('商品') >= 0 || typeName.indexOf('黄金') >= 0) matchedType = defaultTypes[2];
+          else matchedType = defaultTypes[result.length % 3];
+        }
+
+        var funds = [];
+        var fundList = c.funds || c.items || c.list || [];
+        for (var f = 0; f < fundList.length; f++) {
+          var fund = fundList[f];
+          var name = fund.name || fund.fundName || fund.title || '未知基金';
+          var code = fund.code || fund.fundCode || fund.symbol || '';
+          var weight = parseFloat(fund.weight || fund.percent || fund.proportion || 0);
+          if (isNaN(weight)) weight = 0;
+          funds.push({ name: name, code: String(code), weight: weight });
+        }
+
+        var totalPercent = parseFloat(c.totalPercent || c.total || c.percent || c.proportion || 0);
+        if (isNaN(totalPercent)) totalPercent = 0;
+
+        var fundSum = funds.reduce(function(s, f) { return s + f.weight; }, 0);
+        if (fundSum > 0 && Math.abs(fundSum - totalPercent) > 0.1) {
+          for (var k = 0; k < funds.length; k++) {
+            funds[k].weight = (funds[k].weight / fundSum) * totalPercent;
+          }
+        }
+
+        result.push({
+          key: matchedType.key,
+          name: matchedType.name,
+          color: matchedType.color,
+          gradient: this.makeGradient(matchedType.color),
+          totalPercent: totalPercent,
+          funds: funds
+        });
+      }
+
+      return result;
+    },
+
+    makeGradient: function(color) {
+      var rgb = this.hexToRgb(color);
+      return 'linear-gradient(90deg, rgba(' + rgb + ', 0.08) 0%, rgba(' + rgb + ', 0.04) 40%, rgba(' + rgb + ', 0.02) 70%, #ffffff 100%)';
+    },
+
+    hexToRgb: function(hex) {
+      hex = hex.replace('#', '');
+      return parseInt(hex.substring(0, 2), 16) + ',' +
+             parseInt(hex.substring(2, 4), 16) + ',' +
+             parseInt(hex.substring(4, 6), 16);
+    },
+
+    onCategoryTotalFocus: function(ci) {
+      var cat = this.categories[ci];
+      cat._snap = cat.funds.map(function(f) { return f.weight; });
+    },
+
+    onCategoryTotalBlur: function(ci, event) {
+      var cat = this.categories[ci];
+      var newTotal = parseFloat(event.target.value) || 0;
+      var snapshot = cat._snap;
+      var fundsLen = cat.funds.length;
+
+      cat.totalPercent = newTotal;
+
+      if (snapshot && snapshot.length === fundsLen && fundsLen > 0) {
+        var oldSum = snapshot.reduce(function(s, w) { return s + w; }, 0);
+        if (oldSum > 0) {
+          var ratio = newTotal / oldSum;
+          for (var i = 0; i < fundsLen; i++) {
+            cat.funds[i].weight = +(snapshot[i] * ratio).toFixed(4);
+          }
+        } else {
+          var avg = newTotal / fundsLen;
+          for (var i = 0; i < fundsLen; i++) {
+            cat.funds[i].weight = +avg.toFixed(4);
+          }
+        }
+      } else if (fundsLen > 0) {
+        var avg = newTotal / fundsLen;
+        for (var i = 0; i < fundsLen; i++) {
+          cat.funds[i].weight = +avg.toFixed(4);
+        }
+      }
+
+      cat._snap = null;
+      this.saveConfig();
+    },
+
+    onFundWeightInput: function(ci, fi, event) {
+      var newWeight = parseFloat(event.target.value) || 0;
+      this.categories[ci].funds[fi].weight = newWeight;
+
+      var cat = this.categories[ci];
+      cat.totalPercent = cat.funds.reduce(function(sum, f) {
+        return sum + f.weight;
+      }, 0);
+      this.saveConfig();
+    },
+
+    avgCategory: function(ci) {
+      var cat = this.categories[ci];
+      var avg = cat.totalPercent / cat.funds.length;
+      for (var i = 0; i < cat.funds.length; i++) {
+        cat.funds[i].weight = +avg.toFixed(4);
+      }
+      this.saveConfig();
+      this.$message.success(cat.name + ' 已平均分配');
+    },
+
+    removeFund: function(ci, fi) {
+      var cat = this.categories[ci];
+      var fund = cat.funds[fi];
+      var self = this;
+      this.$confirm('确认移除「' + fund.name + '」？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(function() {
+        cat.funds.splice(fi, 1);
+        cat.totalPercent = cat.funds.reduce(function(sum, f) { return sum + f.weight; }, 0);
+        self.saveConfig();
+      }).catch(function() {});
+    },
+
+    clearData: function() {
+      this.categories = [];
+      this.jsonInput = '';
+      localStorage.removeItem('xq3way_config');
+    },
+
+    copyPrompt: function() {
+      var self = this;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(this.promptText).then(function() {
+          self.$message.success('提示语已复制到剪贴板');
+        });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = this.promptText;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        this.$message.success('提示语已复制到剪贴板');
+      }
+    },
+
+    togglePromptExpand: function() {
+      this.promptExpanded = !this.promptExpanded;
+    },
+
+    onNoShowChange: function() {
+      if (this.noShowWelcome) {
+        localStorage.setItem('xq3way_no_welcome', '1');
+      } else {
+        localStorage.removeItem('xq3way_no_welcome');
+      }
+    },
+
+    loadSample: function() {
+      var self = this;
+      if (this.categories && this.categories.length > 0) {
+        this.$confirm('此操作会覆盖当前方案数据，确定吗？', '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(function() {
+          self.doLoadSample();
+        }).catch(function() {});
+      } else {
+        this.doLoadSample();
+      }
+    },
+
+    doLoadSample: function() {
+      var sample = {
+        "categories": [
+          {
+            "type": "bond",
+            "name": "偏债基金",
+            "totalPercent": 50,
+            "funds": [
+              {"name": "招商产业债券 A", "code": "217022", "weight": 20},
+              {"name": "易方达稳健收益债券 A", "code": "110007", "weight": 18},
+              {"name": "鹏华产业债债券 A", "code": "000170", "weight": 12}
+            ]
+          },
+          {
+            "type": "stock",
+            "name": "偏股基金",
+            "totalPercent": 35,
+            "funds": [
+              {"name": "易方达蓝筹精选混合", "code": "005827", "weight": 15},
+              {"name": "中欧时代先锋股票 A", "code": "001938", "weight": 12},
+              {"name": "富国天惠成长混合 A", "code": "161005", "weight": 8}
+            ]
+          },
+          {
+            "type": "commodity",
+            "name": "商品基金",
+            "totalPercent": 15,
+            "funds": [
+              {"name": "华安黄金 ETF 联接 A", "code": "000216", "weight": 10},
+              {"name": "南方原油联接 A", "code": "004420", "weight": 5}
+            ]
+          }
+        ]
+      };
+      this.jsonInput = JSON.stringify(sample, null, 2);
+      this.parseJson();
+      this.saveConfig();
+    }
+  }
+});
+</script>
+</body>
+</html>
