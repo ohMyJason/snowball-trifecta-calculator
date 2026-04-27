@@ -1,3 +1,7 @@
+---
+permalink: /index.html
+---
+
 # 雪球三分法速算器 | Snowball Trifecta Calculator
 
 > 解决雪球组合不能等比例增减大类资产占比的痛点
